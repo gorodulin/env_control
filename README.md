@@ -32,7 +32,7 @@ Then validate the ENV variables only *after* they are all set (manually or by [d
 EnvControl.validate(ENV)
 ```
 
-If the contract has been breached, the `#validate` method raises exception. This behavior can be [customized](#custom-validation-error-handler) to suit your needs.
+If the contract has been breached, the `#validate` method raises `EnvControl::BreachOfContractError` exception. This behavior can be [customized](#custom-validation-error-handler) to suit your needs.
 
 
 ## Contract format explained
@@ -61,15 +61,15 @@ Validators can be:
 - `nil`, which literally means "we expect this variable to be unset".
 - Custom callables (procs, lambdas, any objects that respond to `#call` method)
 - a combination of the above as an Array. In this case, the contract will be considered satisfied if *at least one* of the listed validators is satisfied.
-- environment-specific contracts.
+- [environment-specific](#environment-specific-contracts) contracts.
 
 
 It is allowed to mix validators of different types:
 
 ```ruby
 EnvControl.configuration.contract = {
-  # Allowed values: "true", "false", "weekly", "daily", "hourly"
-  MY_RETRY: [:bool, "weekly", "daily", "hourly"],
+  # Allowed values: "true" OR "false" OR "weekly" OR "daily" OR "hourly" OR nil
+  MY_RETRY: [:bool, "weekly", "daily", "hourly", nil],
 }
 ```
 
@@ -108,6 +108,9 @@ You can [create your own](#custom-validators) validators if needed.
 
 **Important:** Validators only work with non-nil ENV variables. If the variable is not set (nil), the validator won't be called.
 
+## Environment-specific contracts
+
+TODO
 ## Custom validators
 
 You can create your own validators. There are two approaches available.
@@ -161,6 +164,8 @@ gem "env_control"
 `EnvControl.configuration` is a configuration object that contains the default settings. You can set its attributes directly or within a block:
 
 ```ruby
+require "env_control"
+
 EnvControl.configuration do |config|
   config.environment_name = ...
   config.contract = {...}
