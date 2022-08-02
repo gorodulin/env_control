@@ -1,4 +1,5 @@
 /.bundle/
+/.vscode/
 /lib/bundler/man/
 /.yardoc
 /_yardoc/
