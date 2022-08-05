@@ -4,35 +4,35 @@
 
 Ruby approach in creating contracts for ENV variables.
 
-## Why are contracts necessary?
+Contract is a list of all ENV variables your app needs along with their validity criteria. If any of the requirements is not met, a negative scenario will be performed. For example, your application won't start and/or you'll be notified that the ENV variable contains an invalid value. (more on this: [Why are contracts necessary?](#why-are-contracts-necessary))
 
-Having a contract for ENV vars gives you a number of new benefits:
+Highlights:
 
-- You explicitly list all useful variables along with their requirements, so both your developers and devops know exactly which values are acceptable and which are not.
-- You prevent your app from starting if there is something wrong with the ENV variables. E.g., you never misuse a production adapter or database in a staging environment (see [best practices](#best-practices)).
-- You bring out the implicitly used ENV variables, revealing the hidden expectations of third-party gems. (As we often cannot change the logic of third-party gems, we're supposed to put up with inconsistency assigning, say, `"on"`/`"off"` to some ENV variables they require, `"true"`/`"false"` or `"true"`/`nil` to others, which makes working with ENV vars a poorly documented mess unless we have exposed it all in our contract).
-- You explicitly declare unused variables as `:deprecated`, `:irrelevant` or `:ignore`, leaving developers no question about the applicability of a particular variable.
+- This gem *does not* force you to change the way you work with your ENV vars. It does not coerse/change the values of ENV variables.
+- Not opinionated, not Rails-specific, can be applied to any [non-]ruby project.
+- Customizable and well-tested.
 
-The larger your application, the more useful the ENV contract gets.
+Compare EnvControl with [alternative gems](#alternative-gems) if you're not sure this is what you need.
 
 ## How to use
 
-After [installing](#how-to-install) this gem, define your contract:
+After [installing](#how-to-install) this gem, create the contract:
 
 ```ruby
 EnvControl.configuration.contract = {
+  DB_PASSWORD: :string, # any non-empty string
   MY_UUID_VAR: :uuid,
   ...
 }
 ```
 
-Then validate the ENV variables only *after* they are all set (manually or by [dotenv](https://github.com/bkeepers/dotenv) / [Figaro](https://github.com/laserlemon/figaro)):
+Then validate the ENV variables only *after* they are all set (manually or by [dotenv](https://github.com/bkeepers/dotenv)➚ / [Figaro](https://github.com/laserlemon/figaro)➚):
 
 ```ruby
 EnvControl.validate(ENV)
 ```
 
-If the contract has been breached, the `#validate` method raises `EnvControl::BreachOfContractError` exception. This behavior can be [customized](#custom-validation-error-handler) to suit your needs.
+If the contract has been breached, the `#validate` method raises `EnvControl::BreachOfContractError` exception. This behavior can be [customized](#on_validation_error) to suit your needs.
 
 
 ## Contract format explained
@@ -56,20 +56,22 @@ EnvControl.configuration.contract = {
 The contract is a list of ENV variables and validators you have attached to them.
 
 Validators can be:
-- Symbols, that are essentially names of [built-in validators](#built-in-validators).
-- String literals that are exact values to compare the value with.
 - `nil`, which literally means "we expect this variable to be unset".
-- Custom callables (procs, lambdas, any objects that respond to `#call` method)
-- a combination of the above as an Array. In this case, the contract will be considered satisfied if *at least one* of the listed validators is satisfied.
-- [environment-specific](#environment-specific-contracts) contracts.
+- Symbols, that are essentially names of [built-in validators](#built-in-validators) (see below).
+- String literals that are exact values to compare the value with.
+- [Regular expressions](https://ruby-doc.org/core-3.1.2/Regexp.html) ➚ in case strings are not enough.
+- Custom callables (procs, lambdas, any objects that respond to `#call` method) in case regexps are not enough.
+- a combination of the above as an Array. The contract for the variable will be considered satisfied if *at least one* of the listed validators is satisfied.
+- [environment-specific](#environment-specific-validations) validations.
 
 
 It is allowed to mix validators of different types:
 
 ```ruby
 EnvControl.configuration.contract = {
-  # Allowed values: "true" OR "false" OR "weekly" OR "daily" OR "hourly" OR nil
-  MY_RETRY: [:bool, "weekly", "daily", "hourly", nil],
+  # Allowed values: "true" OR "false" OR "weekly" OR "daily" OR "hourly"
+  # OR number of hours (e.g. "12H") OR nil
+  DLD_RETRY: [:bool, "weekly", "daily", "hourly", /\A\d+H\z/, nil],
 }
 ```
 
@@ -108,9 +110,33 @@ You can [create your own](#custom-validators) validators if needed.
 
 **Important:** Validators only work with non-nil ENV variables. If the variable is not set (nil), the validator won't be called.
 
-## Environment-specific contracts
+## Environment-specific validations
 
-TODO
+The requirements for ENV variables may be different when you run your application in different [environments](https://www.onpathtesting.com/blog/understanding-app-environments-for-software-quality-assurance)➚. For example, it is important in the development environment to prevent calls to the production resources and storages. On the other hand, it makes sense to prohibit the enabling of variables that are responsible for debugging tools in production.
+
+EnvControl allows you to specify environment-specific sets of validators for any of ENV variables. 
+
+```ruby
+EnvControl.configuration do |config|
+  config.environment_name = ENV.fetch('RAILS_ENV')
+  config.contract = {
+    S3_BUCKET: {
+      "production" => :string,  # any non-empty name
+      "test" => /test/,         # any name, containing 'test' in its name
+      "default" => :not_set     # by default the bucket should not be defined
+    },
+    UPLOADS: :existing_folder_path,
+    ...
+  }
+end
+```
+
+You don't have to redefine the whole contract for each environment. It is enough to specify options for a particular variable.
+
+Note that environment names *must be strings*. 
+
+`"default"` is a special reserved name used to define the fallback value.
+
 ## Custom validators
 
 You can create your own validators. There are two approaches available.
@@ -186,17 +212,48 @@ EnvControl.validate(
 )
 ```
 
-### Custom validation error handler
-TODO
+### #environment_name
 
-### environment_name
-TODO
-### contract
-TODO
-### validators_allowing_nil
-TODO
-### on_validation_error
-TODO
+Sets the current environment name for [environment-specific validations](#environment-specific-validations).
+
+### #contract
+
+A Hash (or a Hash-like structure) that defines the [contract](#contract-format-explained). The keys are variable names, the values are the corresponding validators.
+
+### #on_validation_error
+
+As the contract gets breached, the `#validate` method raises `EnvControl::BreachOfContractError` exception. You can customize this behavior by assigning a new callable handler to the `on_validation_error` configuration setting:
+
+```ruby
+EnvControl.configuration.on_validation_error = lambda do |report|
+  error = BreachOfContractError.new(context: { report: report })
+  Rollbar.critical(error)
+end
+```
+
+### #validators_allowing_nil
+
+When an ENV variable is set, it contains a string value, so validators work only with strings - they throw an exception when an attempt is made to validate `nil`. However, it is required some validators to return `true` in response to `nil`. This configuration setting contains the list of such validators: `:deprecated`, `:empty`, `:ignore`, `:irrelevant`, `:not_set` . As you can see, they are mostly just aliases for `nil` with extra meanings.
+
+```ruby
+EnvControl.configuration.validators_allowing_nil << :custom_optional_validator
+```
+
+
+
+## Why are contracts necessary?
+
+Having a contract for ENV vars gives you a number of new benefits:
+
+- You explicitly list all requirements, so both your developers and devops know exactly which values are acceptable and which are not.
+- You prevent your app from starting if there is something wrong with the ENV variables. E.g., you never misuse a production adapter or database in a staging environment (see [best practices](#best-practices)).
+- You bring out the implicitly used ENV variables, revealing the hidden expectations of third-party gems. (As we often cannot change the logic of third-party gems, we're supposed to put up with inconsistency assigning, say, `"on"`/`"off"` to some ENV variables they require, `"true"`/`"false"` or `"true"`/`nil` to others, which makes working with ENV vars a poorly documented mess unless we have exposed it all in our contract).
+- You explicitly declare unused variables as `:deprecated`, `:irrelevant` or `:ignore`, leaving developers no question about the applicability of a particular variable.
+
+The larger your application, the more useful the ENV contract gets.
+
+
+
 ## Best practices
 
 1. Maintain the ENV contract up to date so that other developers can use it as a source of truth about the ENV variables requirements. Feel free to add comments to the contract.
@@ -211,20 +268,55 @@ TODO
 6. Consider defining "virtual" environments via `environment_name=` without introducing them to the application. This may be useful if you, say, need to run your review app in "production" environment but with a more restricted ENV contract:
 
     ```ruby
-      EnvControl.configuration do |config|
-        config.environment_name = \
-          if [ENV['RAILS_ENV'], ENV['REVIEW']] == ['production', 'true']
-            'review' # virtual production-like environment
-          else
-            ENV['RAILS_ENV']
-          end
+    EnvControl.configuration do |config|
+      config.environment_name = \
+        if [ENV['RAILS_ENV'], ENV['REVIEW']] == ['production', 'true']
+          'review' # virtual production-like environment
+        else
+          ENV['RAILS_ENV']
+        end
 
-        config.contract = {
-          S3_BUCKET: {
-            "production" => :string,
-            "review" => "qa_bucket", # safe bucket
-            "default" => :not_set
-          }
+      config.contract = {
+        S3_BUCKET: {
+          "production" => :string,
+          "review" => "qa_bucket", # safe bucket
+          "default" => :not_set
         }
-      end
+      }
+    end
     ````
+
+## Alternative gems
+
+- [envied](https://gitlab.com/envied/envied) gem
+
+- [env_bang and env_bang-rails](https://github.com/jcamenisch/ENV_BANG)
+
+- [require_env](https://github.com/Aethelflaed/require_env)
+
+- [envi](https://github.com/avdgaag/envi) gem
+
+- [valid-env](https://github.com/mhs/valid-env) gem
+
+- [envvar](https://github.com/brendanstennett/envvar)
+
+- [env-dependencies](https://github.com/lukehorvat/env-dependencies) gem
+
+- [envforcer](https://github.com/mojotech/envforcer) gem
+
+- [env_enforcer](https://www.ruby-toolbox.com/projects/env_enforcer) gem
+
+- [env_lint](https://www.ruby-toolbox.com/projects/env_lint) gem
+
+- [env_vars](https://www.ruby-toolbox.com/projects/env_vars) gem
+
+- [env_inspector](https://www.ruby-toolbox.com/projects/env_inspector) gem
+
+- [environment_config](https://github.com/aroundhome/environment_config) gem
+
+- [env-checker](https://github.com/ryanfox1985/env-checker) gem
+
+- [envdocs-ruby](https://github.com/joerodrig/envdocs-ruby/) gem
+  [more](https://www.ruby-toolbox.com/search?display=compact&order=score&page=4&q=env&show_forks=false)
+  
+  
