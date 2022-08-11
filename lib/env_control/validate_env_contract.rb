@@ -47,7 +47,7 @@ module EnvControl
     end
 
     def validate_value!(value)
-      if [Symbol, String, NilClass].include?(value.class) || value.respond_to?(:call)
+      if [Symbol, String, Regexp, NilClass].include?(value.class) || value.respond_to?(:call)
         true
       else
         raise_wrong_value!(value)

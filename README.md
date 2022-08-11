@@ -114,10 +114,10 @@ You can [create your own](#custom-validators) validators if needed.
 
 The requirements for ENV variables may be different when you run your application in different [environments](https://www.onpathtesting.com/blog/understanding-app-environments-for-software-quality-assurance)➚. For example, it is important in the development environment to prevent calls to the production resources and storages. On the other hand, it makes sense to prohibit the enabling of variables that are responsible for debugging tools in production.
 
-EnvControl allows you to specify environment-specific sets of validators for any of ENV variables. 
+EnvControl allows you to specify environment-specific sets of validators for any of ENV variables.
 
 ```ruby
-EnvControl.configuration do |config|
+EnvControl.configure do |config|
   config.environment_name = ENV.fetch('RAILS_ENV')
   config.contract = {
     S3_BUCKET: {
@@ -133,7 +133,7 @@ end
 
 You don't have to redefine the whole contract for each environment. It is enough to specify options for a particular variable.
 
-Note that environment names *must be strings*. 
+Note that environment names *must be strings*.
 
 `"default"` is a special reserved name used to define the fallback value.
 
@@ -192,7 +192,7 @@ gem "env_control"
 ```ruby
 require "env_control"
 
-EnvControl.configuration do |config|
+EnvControl.configure do |config|
   config.environment_name = ...
   config.contract = {...}
   config.on_validation_error = MyContractErrorHander.new
@@ -268,7 +268,7 @@ The larger your application, the more useful the ENV contract gets.
 6. Consider defining "virtual" environments via `environment_name=` without introducing them to the application. This may be useful if you, say, need to run your review app in "production" environment but with a more restricted ENV contract:
 
     ```ruby
-    EnvControl.configuration do |config|
+    EnvControl.configure do |config|
       config.environment_name = \
         if [ENV['RAILS_ENV'], ENV['REVIEW']] == ['production', 'true']
           'review' # virtual production-like environment
@@ -318,5 +318,5 @@ The larger your application, the more useful the ENV contract gets.
 
 - [envdocs-ruby](https://github.com/joerodrig/envdocs-ruby/) gem
   [more](https://www.ruby-toolbox.com/search?display=compact&order=score&page=4&q=env&show_forks=false)
-  
-  
+
+

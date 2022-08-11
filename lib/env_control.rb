@@ -18,20 +18,27 @@ module EnvControl
   autoload(:WrongValueError,                    "env_control/errors.rb")
 
   def self.configuration
-    yield Configuration.instance if block_given?
     Configuration.instance
+  end
+
+  def self.configure(&block)
+    yield Configuration.instance
   end
 
   def self.validate(
       env,
       contract: configuration.contract,
       environment_name: configuration.environment_name,
-      on_error: configuration.on_validation_error
+      on_validation_error: configuration.on_validation_error
     )
     ValidateEnvContract.new.call(contract: contract)
-    ValidateEnvVariables.new.call(env: env, contract: contract, environment_name: environment_name).tap do |report|
-      return on_error.call(report) if on_error && report.any?
-    end
+    report = ValidateEnvVariables.new.call(
+      env: env,
+      contract: contract,
+      environment_name: environment_name
+    )
+    return {} if report.empty?
+    on_validation_error ? on_validation_error.call(report) : report
   end
 
 end

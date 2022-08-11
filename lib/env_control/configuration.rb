@@ -32,5 +32,14 @@ module EnvControl
       raise ArgumentError, "Non-empty string or nil expected" if @environment_name == ""
     end
 
+    def to_h
+      {
+        contract: contract,
+        environment_name: environment_name,
+        on_validation_error: on_validation_error,
+        validators_allowing_nil: validators_allowing_nil,
+      }
+    end
+
   end
 end
