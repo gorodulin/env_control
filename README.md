@@ -2,7 +2,7 @@
 
 > Keywords: #p20220707a #env #variable #contract #ruby #gem
 
-Ruby approach in creating contracts for ENV variables.
+Ruby approach in creating contracts (manifests) for ENV variables.
 
 Contract is a list of all ENV variables your app reads along with their validity criteria. If any of the requirements is not met, a negative scenario will be performed. For example, your application won't be able to start and/or you'll be notified that some ENV variables contain an invalid value. (more on this: [Why are contracts necessary?](#why-are-contracts-necessary))
 
@@ -411,8 +411,9 @@ The larger your application, the more useful the ENV contract gets.
 
 ## Best practices
 
-1. Keep the contract as permissive as you can. Avoid putting sensitive string literals.
+1. Keep the contract as permissive as possible. Avoid putting sensitive string literals.
 2. List variables that are set but not related, marking them as `:irrelevant`. This will remove questions about their applicability.
+2. Disallow unused variables that could potentially affect your apps, marking them as `:not_set`. This may require you to search for ENVs throughout your code base.
 3. Maintain the ENV contract up to date so that other developers can use it as a source of truth about the ENV variables requirements. Feel free to add comments to the contract.
 4. Keep the contract keys alphabetically sorted or group the keys by sub-systems of your application.
 5. Some validators like `:deprecated` are effectively equivalent to `nil`. Give them preference when you need to accompany a requirement to have a variable unset with an appropriate reason.
@@ -421,26 +422,32 @@ The larger your application, the more useful the ENV contract gets.
     MY_VAR: [:deprecated, :string]
     ```
 
-7. Consider defining "virtual" environments via `environment_name=` without introducing them to the application. This may be useful if you, say, need to run your review app in "production" environment but with a more restricted ENV contract:
+7. You may benefit from a contract environment that differs from your app environment. This may be useful if you, say, need to run your review app in "production"-like but restricted environment.
 
-    ```ruby
-    EnvControl.configure do |config|
-      config.environment_name = \
-        if [ENV['RAILS_ENV'], ENV['REVIEW']] == ['production', 'true']
-          'review' # virtual production-like environment
-        else
-          ENV['RAILS_ENV']
-        end
+    <details>
+      <summary>Example</summary>
 
-      config.contract = {
-        S3_BUCKET: {
-          "production" => :string,
-          "review" => "qa_bucket", # safe bucket
-          "default" => :not_set
+      ```ruby
+      EnvControl.configure do |config|
+        config.environment_name = \
+          if [ENV['RAILS_ENV'], ENV['REVIEW']] == ['production', 'true']
+            'review' # virtual production-like environment
+          else
+            ENV.fetch('RAILS_ENV')
+          end
+
+        config.contract = {
+          S3_BUCKET: {
+            "production" => /prod/,
+            "review" => /review/, # safe bucket
+            "default" => :not_set
+          }
         }
-      }
-    end
-    ````
+      end
+      ````
+    </details>
+
+
 
 ## Alternative gems
 
