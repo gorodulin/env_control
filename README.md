@@ -16,7 +16,7 @@ In case you're not sure EnvControl is what you need, consider [alternative gems]
 
 ## How to use
 
-After [installing](#how-to-install) this gem, create the contract:
+After [installing](#how-to-install) this gem, create the Contract:
 
 ```ruby
 EnvControl.configuration.contract = {
@@ -37,7 +37,8 @@ EnvControl.validate(ENV)
 
 In case the contract is breached, [on_validation_error](#on_validation_error) handler will be called with violated parts of contract passed as details. You can customize this  handler to suit your needs.
 
-**Note**: run `validate()` only *after* ENV variables are all set (after [dotenv](https://github.com/bkeepers/dotenv)➚ or [Figaro](https://github.com/laserlemon/figaro)➚):
+**Note**: run `validate()` only *after* ENV variables are all set (after [dotenv](https://github.com/bkeepers/dotenv)➚ or [Figaro](https://github.com/laserlemon/figaro)➚)
+
 ## Contract format explained
 
 Consider the following example:
@@ -212,7 +213,7 @@ You don't have to redefine the whole contract for each environment. It is enough
 
 Note that environment names *must be strings*.
 
-`"default"` is a special reserved name used to define the fallback value.
+`"default"` is a special reserved name used to define a fallback value.
 
 ## Custom validators
 
@@ -341,7 +342,7 @@ A Hash (or a Hash-like structure) that defines the [contract](#contract-format-e
 
 ### #on_validation_error
 
-This configuration settings contains a handler that `validate()` method calls as the contract gets breached.
+This configuration setting contains a handler that `validate()` method calls as the contract gets breached.
 
 There is a default implementation that raises `EnvControl::BreachOfContractError` exception. You can customize this behavior by assigning a new callable handler:
 
