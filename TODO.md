@@ -12,7 +12,7 @@
 
     ```ruby
     contract = {
-      XYZ_HOUR: [1..12],
-      XYZ_TIMEOUT_SEC: [0..3600],
+      XYZ_HOUR: 1..12,
+      XYZ_TIMEOUT_SEC: 0..3600,
     }
     ```
