@@ -4,7 +4,7 @@
 
 Ruby approach in creating contracts for ENV variables.
 
-Contract is a list of all ENV variables your app needs along with their validity criteria. If any of the requirements is not met, a negative scenario will be performed. For example, your application won't start and/or you'll be notified that the ENV variable contains an invalid value. (more on this: [Why are contracts necessary?](#why-are-contracts-necessary))
+Contract is a list of all ENV variables your app reads along with their validity criteria. If any of the requirements is not met, a negative scenario will be performed. For example, your application won't be able to start and/or you'll be notified that some ENV variables contain an invalid value. (more on this: [Why are contracts necessary?](#why-are-contracts-necessary))
 
 Highlights:
 
@@ -12,7 +12,7 @@ Highlights:
 - Not opinionated, not Rails-specific, can be applied to any [non-]ruby project.
 - Customizable and well-tested.
 
-Compare EnvControl with [alternative gems](#alternative-gems) if you're not sure this is what you need.
+In case you're not sure EnvControl is what you need, consider [alternative gems](#alternative-gems).
 
 ## How to use
 
@@ -21,7 +21,7 @@ After [installing](#how-to-install) this gem, create the contract:
 ```ruby
 EnvControl.configuration.contract = {
   DB_PASSWORD: :string, # any non-empty string
-  MY_UUID_VAR: :uuid,
+  MY_UUID_VAR: :uuid,   # an UUID string
   ...
 }
 ```
@@ -32,8 +32,9 @@ Then validate the ENV variables only *after* they are all set (manually or by [d
 EnvControl.validate(ENV)
 ```
 
-If the contract has been breached, the `#validate` method raises `EnvControl::BreachOfContractError` exception. This behavior can be [customized](#on_validation_error) to suit your needs.
+`#validate` method ensures that contract format is valid, and then validates ENV variables against the contract.
 
+In case the contract is breached, [on_validation_error](#on_validation_error) handler will be called with violated parts of contract passed as details. You can customize this  handler to suit your needs.
 
 ## Contract format explained
 
@@ -50,20 +51,21 @@ EnvControl.configuration.contract = {
   MYSQL_PWD: :deprecated,
   RAILS_ENV: ["production", "development", "test"],
   TMPDIR: :existing_file_path,
+  APP_VERSION: /^(?!.*(beta|dev))/, # should not contain 'beta' or 'dev'
+  ...
 }
 ```
 
-The contract is a list of ENV variables and validators you have attached to them.
+A contract is a list of ENV variables and validators you have attached to them.
 
 Validators can be:
 - `nil`, which literally means "we expect this variable to be unset".
-- Symbols, that are essentially names of [built-in validators](#built-in-validators) (see below).
-- String literals that are exact values to compare the value with.
+- Symbols, that are essentially named [built-in validators](#named-built-in-validators) (see below).
+- String literals that are exact values to compare a value with.
 - [Regular expressions](https://ruby-doc.org/core-3.1.2/Regexp.html) ➚ in case strings are not enough.
 - Custom callables (procs, lambdas, any objects that respond to `#call` method) in case regexps are not enough.
-- a combination of the above as an Array. The contract for the variable will be considered satisfied if *at least one* of the listed validators is satisfied.
+- a combination of the above as an Array. Contract will be considered satisfied if *at least one* of the listed validators is satisfied (logical OR).
 - [environment-specific](#environment-specific-validations) validations.
-
 
 It is allowed to mix validators of different types:
 
@@ -75,7 +77,7 @@ EnvControl.configuration.contract = {
 }
 ```
 
-## Built-in validators
+## Named built-in validators
 
 The EnvControl gem contains several built-in validators that you can use in your contracts.
 
@@ -222,14 +224,30 @@ A Hash (or a Hash-like structure) that defines the [contract](#contract-format-e
 
 ### #on_validation_error
 
-As the contract gets breached, the `#validate` method raises `EnvControl::BreachOfContractError` exception. You can customize this behavior by assigning a new callable handler to the `on_validation_error` configuration setting:
+This configuration settings contains a handler that `validate()` method calls as the contract gets breached.
 
-```ruby
-EnvControl.configuration.on_validation_error = lambda do |report|
-  error = BreachOfContractError.new(context: { report: report })
-  Rollbar.critical(error)
-end
-```
+There is a default implementation that raises `EnvControl::BreachOfContractError` exception. You can customize this behavior by assigning a new callable handler:
+
+<details>
+  <summary>Example</summary>
+
+  ```ruby
+  EnvControl.configure do |config|
+    config.on_validation_error = lambda do |report|
+      error = BreachOfContractError.new(context: { report: report })
+      Rollbar.critical(error)
+    end
+  end
+  ```
+
+  Or, in case you don't need to raise any errors:
+
+  ```ruby
+  EnvControl.configuration.on_validation_error = ->(report) { report }
+  EnvControl.validate(ENV) # returns report as a Hash with no error raised
+  ```
+</details>
+
 
 ### #validators_allowing_nil
 
