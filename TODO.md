@@ -5,3 +5,12 @@
 - [ ] Cover all named validators with specs.
 - [ ] README: Describe alternative gems, pros and cons
 - [ ] Implement a tool that tracks ENV var reading and matches to contract coverage.
+- [ ] Implement :crontab validator
+- [ ] Allow ranges as validators:
+
+    ```ruby
+    contract = {
+      XYZ_HOUR: [1..12],
+      XYZ_TIMEOUT_SEC: [0..3600],
+    }
+    ```
