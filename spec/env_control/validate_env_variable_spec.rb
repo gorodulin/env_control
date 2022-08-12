@@ -25,9 +25,14 @@ RSpec.describe EnvControl::ValidateEnvVariable do
   end
 
   context "when value satisfies contract" do
-    let(:value) { "off" }
-    context "when expected string value" do
+    context "when expected String value" do
+      let(:value) { "off" }
       let(:contract) { ["on", "off"] }
+      it { is_expected.to eq(true) }
+    end
+    context "when expected Regexp value" do
+      let(:value) { "my_prod_database" }
+      let(:contract) { [/prod/] }
       it { is_expected.to eq(true) }
     end
   end

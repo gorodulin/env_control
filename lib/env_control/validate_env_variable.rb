@@ -20,6 +20,8 @@ module EnvControl
         value.nil?
       when String
         value == validator
+      when Regexp
+        value.match?(validator)
       when Symbol
         run_validator(validator, name, value)
       else
