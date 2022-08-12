@@ -1,5 +1,7 @@
 # TODOs
 
+- [ ] More specs on "" empty strings
+- [ ] More specs on evironment-specific contracts with/without "default" section
 - [ ] Allow callable validators to return non-boolean values for processing them as non-callable validators.
 - [ ] README: Describe how to validate interdependency of ENV vars.
 - [ ] Cover all named validators with specs.
