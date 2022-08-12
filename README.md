@@ -26,7 +26,8 @@ EnvControl.configuration.contract = {
 }
 ```
 
-Then validate the ENV variables only *after* they are all set (manually or by [dotenv](https://github.com/bkeepers/dotenv)➚ / [Figaro](https://github.com/laserlemon/figaro)➚):
+Then validate the ENV variables:
+
 
 ```ruby
 EnvControl.validate(ENV)
@@ -36,6 +37,7 @@ EnvControl.validate(ENV)
 
 In case the contract is breached, [on_validation_error](#on_validation_error) handler will be called with violated parts of contract passed as details. You can customize this  handler to suit your needs.
 
+**Note**: run `validate()` only *after* ENV variables are all set (after [dotenv](https://github.com/bkeepers/dotenv)➚ or [Figaro](https://github.com/laserlemon/figaro)➚):
 ## Contract format explained
 
 Consider the following example:
@@ -51,7 +53,6 @@ EnvControl.configuration.contract = {
   MYSQL_PWD: :deprecated,
   RAILS_ENV: ["production", "development", "test"],
   TMPDIR: :existing_file_path,
-  APP_VERSION: /^(?!.*(beta|dev))/, # should not contain 'beta' or 'dev'
   ...
 }
 ```
@@ -59,23 +60,92 @@ EnvControl.configuration.contract = {
 A contract is a list of ENV variables and validators you have attached to them.
 
 Validators can be:
-- `nil`, which literally means "we expect this variable to be unset".
-- Symbols, that are essentially named [built-in validators](#named-built-in-validators) (see below).
+
 - String literals that are exact values to compare a value with.
+
+  <details>
+    <summary>Examples</summary>
+
+    ```ruby
+    EnvControl.configuration.contract = {
+      MY_SWITCH: "on",
+      MY_BOOL: ["true", "false"], # same as :bool
+    }
+    ```
+  </details>
+
+- `nil`, which literally means "we expect this variable to be unset".
+
+  <details>
+    <summary>Examples</summary>
+
+    ```ruby
+    EnvControl.configuration.contract = {
+      DATABASE_HOST: nil,     # must be unset in preference to DATABASE_URL
+      MY_SWITCH: ["on", nil], # "on" OR not set
+    }
+    ```
+  </details>
+- Symbols, that are essentially [names of predefined validators](#named-built-in-validators).
+
+  <details>
+    <summary>Examples</summary>
+
+    ```ruby
+    EnvControl.configuration.contract = {
+      MY_VAR2: :bool, # "true" OR "false"
+      MYSQL_DEBUG: :not_set,  # same as nil
+      MYSQL_PWD: :deprecated, # same as nil
+    }
+    ```
+  </details>
+
 - [Regular expressions](https://ruby-doc.org/core-3.1.2/Regexp.html) ➚ in case strings are not enough.
+  <details>
+    <summary>Examples</summary>
+
+    ```ruby
+    EnvControl.configuration.contract = {
+      # same as :integer
+      TIME_SHIFT_SEC: /\A[-]{,1}\d+\z/,
+      # should not contain "beta" or "dev"
+      APP_VERSION: /^(?!.*(beta|dev))/,
+    }
+    ```
+  </details>
 - Custom callables (procs, lambdas, any objects that respond to `#call` method) in case regexps are not enough.
+
+  <details>
+    <summary>Examples</summary>
+
+    ```ruby
+    EnvControl.configuration.contract = {
+      FILENAME_FORMAT: CustomFilenameFormatValidator.new,
+      DATABASE_NAME: -> { _1.start_with?("production") }
+    }
+    ```
+
+    Learn more about creating [custom callable validators](#custom-callables).
+  </details>
+
 - a combination of the above as an Array. Contract will be considered satisfied if *at least one* of the listed validators is satisfied (logical OR).
+
+  <details>
+    <summary>Example</summary>
+
+    ```ruby
+    EnvControl.configuration.contract = {
+      DLD_RETRY: [:bool, "weekly", "daily", "hourly", /\A\d+H\z/, nil],
+    }
+    ```
+    This example combines validators of different types, allowing only: `"true"` OR `"false"` OR `"weekly"` OR `"daily"` OR `"hourly"` OR number of hours (e.g. `"12H"`) OR `nil`
+  </details>
+
 - [environment-specific](#environment-specific-validations) validations.
 
-It is allowed to mix validators of different types:
 
-```ruby
-EnvControl.configuration.contract = {
-  # Allowed values: "true" OR "false" OR "weekly" OR "daily" OR "hourly"
-  # OR number of hours (e.g. "12H") OR nil
-  DLD_RETRY: [:bool, "weekly", "daily", "hourly", /\A\d+H\z/, nil],
-}
-```
+
+
 
 ## Named built-in validators
 
@@ -83,38 +153,39 @@ The EnvControl gem contains several built-in validators that you can use in your
 
 Built-in validators are simply method names specified as symbols, e.g. `:string`, `:uuid`, `:email` etc.
 
-These methods take ENV variable as input argument and return 'true' or 'false' depending on its value.
+These methods take ENV variable as input argument and return `true` or `false` depending on its value. Named validators (with some [exceptions](#validatorsallowingnil)) only work with non-nil ENV variables.
 
 
 List of built-in validators:
 
-| Validator               | Acceptable values     | Comments                 |
-|-------------------------|-----------------------|--------------------------|
-| `:bool`                 | `"true"`, `"false"`   |                          |
-| `:string`               | any non-empty string  | `" "` considered empty   |
-| `:email`                | any e-mail address    |                          |
-| `:integer`              | any integer string    |                          |
-| `:hex`                  | hexadecimal numbers   |                          |
-| `:ignore`               | `nil` / any string    | Allows empty `""` value  |
-| `:empty`                | `nil` or empty string | Same as `[:not_set, ""]` |
-| `:irrelevant`           | `nil` / any string    | Synonym for `:ignore`    |
-| `:deprecated`           | `nil` (not set)       | Synonym for `nil`        |
-| `:not_set`              | `nil` (not set)       | Synonym for `nil`        |
-| `:uri`                  | any uri               |                          |
-| `:https_uri`            | any secure http uri   |                          |
-| `:postgres_uri`         | any postgres uri      |                          |
-| `:uuid`                 | UUID string           |                          |
-| `:existing_path`        | file or folder path   | Both files and dirs      |
-| `:existing_file_path`   | full file path        |                          |
-| `:existing_folder_path` | full folder path      |                          |
+| Validator               | Acceptable values     | Comments                  |
+|-------------------------|-----------------------|---------------------------|
+| `:bool`                 | `"true"`, `"false"`   |                           |
+| `:string`               | any non-empty string  | `" "` considered empty    |
+| `:email`                | any e-mail address    |                           |
+| `:integer`              | any integer string    |                           |
+| `:hex`                  | hexadecimal numbers   |                           |
+| `:empty`                | `nil` or empty string | Same as `[:not_set, ""]`  |
+| `:deprecated`           | `nil` (not set)       | Synonym for `nil`         |
+| `:not_set`              | `nil` (not set)       | Synonym for `nil`         |
+| `:uri`                  | any uri               |                           |
+| `:https_uri`            | any secure http uri   |                           |
+| `:postgres_uri`         | any postgres uri      |                           |
+| `:uuid`                 | UUID string           |                           |
+| `:existing_file_path`   | full file path        |                           |
+| `:existing_folder_path` | full folder path      |                           |
+| `:existing_path`        | file or folder path   |                           |
+| `:irrelevant`           | `nil` / any string    | Literally anything        |
+| `:ignore`               | `nil` / any string    | Synonym for `:irrelevant` |
 
-You can [create your own](#custom-validators) validators if needed.
 
-**Important:** Validators only work with non-nil ENV variables. If the variable is not set (nil), the validator won't be called.
+You can create [your own named validators](#custom-named-validators) if needed.
 
 ## Environment-specific validations
 
-The requirements for ENV variables may be different when you run your application in different [environments](https://www.onpathtesting.com/blog/understanding-app-environments-for-software-quality-assurance)➚. For example, it is important in the development environment to prevent calls to the production resources and storages. On the other hand, it makes sense to prohibit the enabling of variables that are responsible for debugging tools in production.
+The requirements for ENV variables may be different when you run your application in different [environments](https://www.onpathtesting.com/blog/understanding-app-environments-for-software-quality-assurance)➚.
+
+*For example, it is important in the development environment to prevent calls to production resources and storages. On the other hand, it makes sense to prohibit the enabling of variables that are responsible for debugging tools in production.*
 
 EnvControl allows you to specify environment-specific sets of validators for any of ENV variables.
 
@@ -124,8 +195,12 @@ EnvControl.configure do |config|
   config.contract = {
     S3_BUCKET: {
       "production" => :string,  # any non-empty name
-      "test" => /test/,         # any name, containing 'test' in its name
-      "default" => :not_set     # by default the bucket should not be defined
+      "test" => /test/,         # any name containing 'test' substring
+      "default" => :not_set,    # by default the bucket should not be defined
+    },
+    FILTER_SENSITIVE: {
+      "production" => "true",
+      "default" => :bool,
     },
     UPLOADS: :existing_folder_path,
     ...
@@ -143,36 +218,40 @@ Note that environment names *must be strings*.
 
 You can create your own validators. There are two approaches available.
 
-1. Callable objects. Validators of this kind must respond to the `#call` method, so they can be `Proc`s, `Lambda`s or custom objects.
+### Custom callables
 
-    ```ruby
-    class StrongPasswordValidator
-      def self.call(string)
-        string.match? A_STRONG_PASSWORD_REGEX
-      end
+Validators of this kind must respond to the `#call` method, so they can be `Proc`s, `Lambda`s or custom objects.
+
+  ```ruby
+  class StrongPasswordValidator
+    def self.call(string)
+      string.match? A_STRONG_PASSWORD_REGEX
     end
+  end
 
-    EnvControl.configuration.contract = {
-      DB_PASSWORD: [StrongPasswordValidator, :not_set],
-    }
-    ```
+  EnvControl.configuration.contract = {
+    DB_PASSWORD: [StrongPasswordValidator, :not_set],
+  }
+  ```
 
-2. Custom methods to extend `EnvControl::Validators` module. These methods can reuse existing validators, making "AND" logic available to you:
+### Custom named validators
 
-    ```ruby
-    module MyContractValidators
-      def irc_uri(string)
-        uri(string) && URI(string).scheme.eql?("irc")
-      end
+Custom methods to extend `EnvControl::Validators` module. These methods can reuse existing validators, making "AND" logic available to you:
+
+  ```ruby
+  module MyContractValidators
+    def irc_uri(string)
+      uri(string) && URI(string).scheme.eql?("irc")
     end
+  end
 
-    EnvControl::Validators.extend(MyContractValidators)
+  EnvControl::Validators.extend(MyContractValidators)
 
-    EnvControl.configuration.contract = {
-      IRC_CHANNEL: :irc_uri,
-      ...
-    }
-    ```
+  EnvControl.configuration.contract = {
+    IRC_CHANNEL: :irc_uri,
+    ...
+  }
+  ```
 
 ## How to install
 
@@ -189,7 +268,7 @@ gem "env_control"
 
 ## Configuration
 
-`EnvControl.configuration` is a configuration object that contains the default settings. You can set its attributes directly or within a block:
+`EnvControl.configuration` is a global configuration object for EnvControl. You can set its attributes directly or within `configure` method's block:
 
 ```ruby
 require "env_control"
@@ -197,30 +276,68 @@ require "env_control"
 EnvControl.configure do |config|
   config.environment_name = ...
   config.contract = {...}
-  config.on_validation_error = MyContractErrorHander.new
+  config.on_validation_error = MyContractErrorHander
 end
 
 EnvControl.validate(ENV)
 ```
 
-Alternatively, you can provide/override contract using keyword attributes in `#validate` method:
+Global configuration settings are not mandatory as you can rely on corresponding keyword attributes in `#validate` method.
 
-```ruby
-EnvControl.validate(
-  ENV,
-  environment_name: "review",
-  contract: contract,
-  on_validation_error: MyContractErrorHander.new,
-)
-```
+<details>
+  <summary>Example</summary>
+
+  ```ruby
+  contract = {
+    ...
+  }
+
+  EnvControl.validate(
+    ENV,
+    environment_name: "review",
+    contract: contract,
+    on_validation_error: MyContractErrorHander,
+  )
+  ```
+</details>
+
+Configuration settings you can read and write:
+
+- [#environment_name](#environmentname)
+- [#contract](#contract)
+- [#on_validation_error](#onvalidationerror)
+- [#validators_allowing_nil](#validatorsallowingnil)
 
 ### #environment_name
 
 Sets the current environment name for [environment-specific validations](#environment-specific-validations).
 
+<details>
+  <summary>Example</summary>
+
+  ```ruby
+  EnvControl.configure do |config|
+    config.environment_name = ENV.fetch('RAILS_ENV')
+  end
+  ```
+</details>
+
 ### #contract
 
 A Hash (or a Hash-like structure) that defines the [contract](#contract-format-explained). The keys are variable names, the values are the corresponding validators.
+
+<details>
+  <summary>Example</summary>
+
+  ```ruby
+  EnvControl.configure do |config|
+    config.environment_name = ENV.fetch('RAILS_ENV')
+    config.contract = {
+      # ...
+    }
+  end
+  ```
+</details>
 
 ### #on_validation_error
 
@@ -240,7 +357,7 @@ There is a default implementation that raises `EnvControl::BreachOfContractError
   end
   ```
 
-  Or, in case you don't need to raise any errors:
+  Or, in case you need to get report without raising an error:
 
   ```ruby
   EnvControl.configuration.on_validation_error = ->(report) { report }
@@ -251,13 +368,33 @@ There is a default implementation that raises `EnvControl::BreachOfContractError
 
 ### #validators_allowing_nil
 
-When an ENV variable is set, it contains a string value, so validators work only with strings - they throw an exception when an attempt is made to validate `nil`. However, it is required some validators to return `true` in response to `nil`. This configuration setting contains the list of such validators: `:deprecated`, `:empty`, `:ignore`, `:irrelevant`, `:not_set` . As you can see, they are mostly just aliases for `nil` with extra meanings.
+[Named validators](#named-built-in-validators) work only with strings - they usually return `false` when an attempt is made to validate `nil`.
 
-```ruby
-EnvControl.configuration.validators_allowing_nil << :custom_optional_validator
-```
+However, in rare cases you may need some validators to return `true` in response to `nil`. There is a list of such validators, which you can extend as needed.
 
+<details>
+  <summary>Example</summary>
 
+  ```ruby
+  EnvControl.configuration.validators_allowing_nil
+  => [:deprecated, :empty, :ignore, :irrelevant, :not_set]
+
+  EnvControl.configuration.validators_allowing_nil << :custom_optional_validator
+
+  EnvControl.configuration.validators_allowing_nil
+  => [:deprecated, :empty, :ignore, :irrelevant, :not_set, :custom_optional_validator]
+  ```
+
+  As you can see, listed validators are mostly just aliases for `nil` with extra meanings.
+
+  In most scenarios it is better to allow `nil` explicitly:
+
+  ```ruby
+  EnvControl.configuration.contract = {
+    DLD_RETRY: [:my_custom_validator, nil],
+  }
+  ```
+</details>
 
 ## Why are contracts necessary?
 
@@ -274,16 +411,17 @@ The larger your application, the more useful the ENV contract gets.
 
 ## Best practices
 
-1. Maintain the ENV contract up to date so that other developers can use it as a source of truth about the ENV variables requirements. Feel free to add comments to the contract.
-2. Keep the contract keys alphabetically sorted or group the keys by sub-systems of your application.
-3. Keep the contract as permissive as you can. Avoid putting sensitive string literals.
-4. Some validators like `:deprecated` are effectively equivalent to `nil`. Give them preference when you need to accompany a requirement to have a variable unset with an appropriate reason.
-5. Add `:deprecated` to existing validators before proceeding to remove code that uses the variable., e.g.:
+1. Keep the contract as permissive as you can. Avoid putting sensitive string literals.
+2. List variables that are set but not related, marking them as `:irrelevant`. This will remove questions about their applicability.
+3. Maintain the ENV contract up to date so that other developers can use it as a source of truth about the ENV variables requirements. Feel free to add comments to the contract.
+4. Keep the contract keys alphabetically sorted or group the keys by sub-systems of your application.
+5. Some validators like `:deprecated` are effectively equivalent to `nil`. Give them preference when you need to accompany a requirement to have a variable unset with an appropriate reason.
+6. Add `:deprecated` to existing validators before proceeding to remove code that uses the variable., e.g.:
     ```ruby
     MY_VAR: [:deprecated, :string]
     ```
 
-6. Consider defining "virtual" environments via `environment_name=` without introducing them to the application. This may be useful if you, say, need to run your review app in "production" environment but with a more restricted ENV contract:
+7. Consider defining "virtual" environments via `environment_name=` without introducing them to the application. This may be useful if you, say, need to run your review app in "production" environment but with a more restricted ENV contract:
 
     ```ruby
     EnvControl.configure do |config|
