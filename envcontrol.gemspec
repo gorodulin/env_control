@@ -7,8 +7,14 @@ Gem::Specification.new do |spec|
   spec.version       = EnvControl::VERSION
   spec.authors       = ["Vladimir Gorodulin"]
   spec.email         = ["ru.hostmaster@gmail.com"]
-  spec.description   = %q{Contract for ENV variables}
-  spec.summary       = %q{Contract for ENV variables}
+  spec.description   = %q{Ruby approach in creating contracts for ENV variables}
+  spec.description   = %q{Contract-based prevention from running your app with invalid ENV variables}
+  spec.summary       = <<-EOS
+  Prevent your app from running with invalid ENV variables.
+  Define a contract that lists all the required/optional environment
+  variables along with their peculiar protective constraints
+  specific to your application.
+  EOS
   spec.homepage      = "https://github.com/gorodulin/env_control"
   spec.license       = "MIT"
 
