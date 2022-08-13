@@ -1,5 +1,6 @@
 # TODOs
 
+- [ ] Test Ruby 1.9.2
 - [ ] More specs on "" empty strings
 - [ ] More specs on evironment-specific contracts with/without "default" section
 - [ ] Allow callable validators to return non-boolean values for processing them as non-callable validators.
