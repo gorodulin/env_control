@@ -1,6 +1,6 @@
 # ENV variables contract
 
-> Keywords: #p20220707a #env #variable #contract #ruby #gem
+> Keywords: #env #variable #contract #ruby #gem #environment #p20220707a
 
 Ruby approach in creating contracts (manifests) for ENV variables.
 
@@ -39,26 +39,26 @@ In case the contract is breached, [on_validation_error](#on_validation_error) ha
 
 **Note**: run `validate()` only *after* ENV variables are all set (after [dotenv](https://github.com/bkeepers/dotenv)➚ or [Figaro](https://github.com/laserlemon/figaro)➚)
 
-## Contract format explained
+## Contract format
 
 Consider the following example:
 
 ```ruby
 EnvControl.configuration.contract = {
-  ADMIN_EMAIL: :email,
-  DEBUG: ["true", nil],
-  LC_CTYPE: "UTF-8",
-  MY_VAR1: :string,
-  MY_VAR2: :bool,
-  MYSQL_DEBUG: :not_set, # same as nil
-  MYSQL_PWD: :deprecated,
-  RAILS_ENV: ["production", "development", "test"],
+  ADMIN_EMAIL: :email,    # any valid email address
+  DEBUG: ["true", nil],   # "true" or unset (nil)
+  LC_CTYPE: "UTF-8",      # nothing but "UTF-8"
+  MY_VAR1: :string,       # any non-empty string
+  MY_VAR2: :bool,         # "true" or "false"
+  MYSQL_DEBUG: :not_set,  # unset w/o a reason (effectively same as nil)
+  MYSQL_PWD: :deprecated, # unset as deprecated (effectively same as nil)
+  RAILS_ENV: ["production", "development", "test"], # limited to these 3 options
   TMPDIR: :existing_file_path,
   ...
 }
 ```
 
-A contract is a list of ENV variables and validators you have attached to them.
+A contract is a **list of ENV variables and validators** you have attached to them.
 
 Validators can be:
 
@@ -173,9 +173,9 @@ List of built-in validators:
 | `:https_uri`            | any secure http uri   |                           |
 | `:postgres_uri`         | any postgres uri      |                           |
 | `:uuid`                 | UUID string           |                           |
-| `:existing_file_path`   | full file path        |                           |
-| `:existing_folder_path` | full folder path      |                           |
-| `:existing_path`        | file or folder path   |                           |
+| `:existing_file_path`   | full file path        | Absolute path             |
+| `:existing_folder_path` | full folder path      | Absolute path             |
+| `:existing_path`        | file or folder path   | Absolute path             |
 | `:irrelevant`           | `nil` / any string    | Literally anything        |
 | `:ignore`               | `nil` / any string    | Synonym for `:irrelevant` |
 
@@ -269,7 +269,7 @@ gem "env_control"
 
 ## Configuration
 
-`EnvControl.configuration` is a global configuration object for EnvControl. You can set its attributes directly or within `configure` method's block:
+`EnvControl.configuration` is a global configuration object. You can set its attributes directly or within `configure` block:
 
 ```ruby
 require "env_control"
@@ -325,7 +325,7 @@ Sets the current environment name for [environment-specific validations](#enviro
 
 ### #contract
 
-A Hash (or a Hash-like structure) that defines the [contract](#contract-format-explained). The keys are variable names, the values are the corresponding validators.
+A Hash (or a Hash-like structure) that defines the [contract](#contract-format). The keys are variable names, the values are the corresponding validators.
 
 <details>
   <summary>Example</summary>
@@ -362,7 +362,8 @@ There is a default implementation that raises `EnvControl::BreachOfContractError
 
   ```ruby
   EnvControl.configuration.on_validation_error = ->(report) { report }
-  EnvControl.validate(ENV) # returns report as a Hash with no error raised
+
+  EnvControl.validate(ENV) # return report as a Hash with no error raised
   ```
 </details>
 
