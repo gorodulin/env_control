@@ -2,7 +2,7 @@
 
 require 'spec_helper.rb'
 
-RSpec.describe EnvControl::ValidateEnvVariables do
+RSpec.describe EnvControl::ValidateContract do
 
   subject { described_class.new.call(contract: contract, env: env, environment_name: environment_name) }
 

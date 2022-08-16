@@ -6,16 +6,18 @@ module EnvControl
 
   autoload(:BreachOfContractError,              "env_control/errors.rb")
   autoload(:Configuration,                      "env_control/configuration.rb")
-  autoload(:EnvironmentNameNotConfiguredError,  "env_control/errors.rb")
-  autoload(:GetEnvironmentSpecificContract,     "env_control/get_environment_specific_contract.rb")
+  autoload(:EmptyEnvironmentNameError,          "env_control/errors.rb")
+  autoload(:Helpers,                            "env_control/helpers.rb")
+  autoload(:MissingEnvironmentError,            "env_control/errors.rb")
   autoload(:NonStringEnvironmentNameError,      "env_control/errors.rb")
   autoload(:NonSymbolicKeyError,                "env_control/errors.rb")
-  autoload(:ValidateEnvContract,                "env_control/validate_env_contract.rb")
-  autoload(:ValidateEnvVariable,                "env_control/validate_env_variable.rb")
-  autoload(:ValidateEnvVariables,               "env_control/validate_env_variables.rb")
-  autoload(:Validators,                         "env_control/validators.rb")
   autoload(:VERSION,                            "env_control/version.rb")
-  autoload(:WrongValueError,                    "env_control/errors.rb")
+  autoload(:ValidateContract,                   "env_control/validate_contract.rb")
+  autoload(:ValidateContractFormat,             "env_control/validate_contract_format.rb")
+  autoload(:ValidateVariableContract,           "env_control/validate_variable_contract.rb")
+  autoload(:Validators,                         "env_control/validators.rb")
+  autoload(:WrongContractError,                 "env_control/errors.rb")
+  autoload(:WrongValidatorTypeError,            "env_control/errors.rb")
 
   def self.configuration
     Configuration.instance
@@ -31,8 +33,7 @@ module EnvControl
       environment_name: configuration.environment_name,
       on_validation_error: configuration.on_validation_error
     )
-    ValidateEnvContract.new.call(contract: contract)
-    report = ValidateEnvVariables.new.call(
+    report = ValidateContract.new.call(
       env: env,
       contract: contract,
       environment_name: environment_name

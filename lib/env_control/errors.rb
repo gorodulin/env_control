@@ -15,38 +15,63 @@ module EnvControl
     end
   end
 
-  class EnvironmentNameNotConfiguredError < Error
-    MSG = "Can't pick environment-specific contract for %s variable. " +
-          "EnvControl.configuration.environment_name is not set."
+  class EmptyEnvironmentNameError < Error
+    MSG = "contract of %s variable requires environment name to be set"
 
     def details(context)
-      MSG % [context[:env_var]]
+      MSG % [context[:var_name]]
     end
   end
 
-  class NonStringEnvironmentNameError < Error
-    MSG = "Not a String key %s (%s) for %s contract"
+  class ContractFormatError < Error
+    MSG = "validator %s (%s) for %s variable (%s environment)"
 
     def details(context)
       MSG % [
-        context[:environment_name].inspect,
-        context[:environment_name].class.inspect,
-        context[:env_var],
+        context.fetch(:var_contract).inspect,
+        context.fetch(:var_contract).class.inspect,
+        context.fetch(:var_name),
+        context.fetch(:environment, "any")
       ]
     end
   end
 
-  class WrongValueError < Error
-    MSG = "Wrong value: %s (%s) for %s contract (%s environment)"
+  class MissingEnvironmentError < ContractFormatError
+    MSG = "Contract for %s variable is missing %s environment"
 
     def details(context)
       MSG % [
-        context[:value].inspect,
-        context[:value].class.inspect,
-        context[:env_var],
-        context[:environment_name] || "any"
+        context.fetch(:var_name),
+        context.fetch(:environment),
       ]
     end
+  end
+
+  class NonStringEnvironmentNameError < ContractFormatError
+    MSG = "Invalid environment name in %s variable contract"
+
+    def details(context)
+      MSG % [
+        context.fetch(:var_name),
+      ]
+    end
+  end
+
+  class WrongValidatorTypeError < ContractFormatError
+    MSG = "contract %s contains a wrong validator (%s) for %s variable (%s environment)"
+
+    def details(context)
+      MSG % [
+        context.fetch(:var_contract).inspect,
+        context.fetch(:var_validator).class.inspect,
+        context.fetch(:var_name),
+        context.fetch(:environment, "any")
+      ]
+    end
+  end
+
+  class EmptyContractError < ContractFormatError
+    MSG = "contract %s (%s) for %s variable (%s environment)"
   end
 
   class NonSymbolicKeyError < Error

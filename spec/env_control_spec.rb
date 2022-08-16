@@ -12,8 +12,8 @@ RSpec.describe EnvControl do
   end
 
   describe "#validate" do
-    let(:so_validate_env_contract) { instance_double(EnvControl::ValidateEnvContract) }
-    let(:so_validate_env_variables) { instance_double(EnvControl::ValidateEnvVariables) }
+    let(:so_validate_contract_format) { instance_double(EnvControl::ValidateContractFormat) }
+    let(:so_validate_contract) { instance_double(EnvControl::ValidateContract) }
     let(:configuration) { instance_double(EnvControl::Configuration, contract: contract, environment_name: environment_name, on_validation_error: on_validation_error) }
     let(:contract) { { "MY_VAR" => "true" } }
     let(:env) { { "MY_VAR" => "true" } }
@@ -22,15 +22,15 @@ RSpec.describe EnvControl do
 
     before do
       allow(EnvControl::Configuration).to receive(:instance).and_return(configuration)
-      allow(EnvControl::ValidateEnvContract).to receive(:new).and_return(so_validate_env_contract)
-      allow(EnvControl::ValidateEnvVariables).to receive(:new).and_return(so_validate_env_variables)
+      allow(EnvControl::ValidateContractFormat).to receive(:new).and_return(so_validate_contract_format)
+      allow(EnvControl::ValidateContract).to receive(:new).and_return(so_validate_contract)
     end
 
     it "validates contract format and environment variables" do
-      expect(so_validate_env_contract)
+      expect(so_validate_contract_format)
         .to receive(:call)
-        .with(contract: subject.configuration.contract)
-      expect(so_validate_env_variables)
+        .with(contract: subject.configuration.contract, environment_name: environment_name)
+      expect(so_validate_contract)
         .to receive(:call)
         .with(env: env, contract: contract, environment_name: environment_name)
         .and_return({MY_VAR: ["true"]})

@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
 module EnvControl
-  class ValidateEnvVariable
+  class ValidateVariableContract
+    include Helpers
 
     def call(name, value, contract)
       raise ArgumentError unless [String, NilClass].include?(value.class)
 
-      [contract].flatten.each do |validator|
+      as_array(contract).flatten.each do |validator|
         return true if satisfies?(name, value, validator)
       end
       false

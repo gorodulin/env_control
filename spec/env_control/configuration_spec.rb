@@ -38,6 +38,11 @@ RSpec.describe EnvControl::Configuration do
       expect(subject.environment_name).to eq("production")
     end
 
+    context "when not set" do
+      xit "raises error when an environment-specific contract is defined" do
+      end
+    end
+
     context "when being set" do
       it "turns non-nil values into String (including callables)" do
         {
